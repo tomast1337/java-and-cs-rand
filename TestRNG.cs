@@ -14,6 +14,7 @@
 
 /// <summary>
 /// C# port of Java's 48-bit LCG (Linear Congruential Generator) from java.util.Random.
+/// Original source: https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/util/Random.java
 /// Implements the exact algorithm: seed = (seed * 0x5DEECE66DL + 0xBL) &amp; ((1L &lt;&lt; 48) - 1)
 /// </summary>
 internal sealed class JavaRandom
