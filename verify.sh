@@ -33,8 +33,12 @@ echo "=== Running (seed=$SEED) ==="
 echo "Running Java..."
 java TestRNG "$SEED" > java_out.txt
 
-# Run C# and capture full output (stderr shown - IKVM may fail on some Linux with libiava.so symbol errors)
+# Run C# and capture full output (LD_LIBRARY_PATH needed for IKVM native libs on Linux)
 echo "Running C# (Native + Custom + IKVM)..."
+IKVM_BIN="$SCRIPT_DIR/bin/Release/net10.0/ikvm/linux-x64/bin"
+if [ -d "$IKVM_BIN" ]; then
+    export LD_LIBRARY_PATH="$IKVM_BIN${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 dotnet run --project TestRNG.csproj -c Release -- "$SEED" 2>&1 | tee cs_full.txt || true
 
 # Extract Custom C# section: 100 integer lines after "# Custom C#"
