@@ -1,0 +1,58 @@
+############################
+# General
+############################
+
+# OS / misc
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.swp
+*.swo
+
+# IDE / editor
+.vscode/
+.idea/
+*.user
+*.suo
+*.userprefs
+
+############################
+# .NET / C#
+############################
+
+# Build outputs
+bin/
+obj/
+
+# Visual Studio / MSBuild
+.vs/
+[Rr]elease*/
+[Dd]ebug*/
+[Tt]est[Rr]esult*/
+TestResult.xml
+
+############################
+# Java
+############################
+
+*.class
+*.jar
+*.war
+*.ear
+*.iml
+.classpath
+.project
+.settings/
+
+############################
+# Local artifacts for this repo
+############################
+
+# Generated outputs / verification logs
+java_out.txt
+cs_full.txt
+custom_out.txt
+ikvm_out.txt
+TestRNG.class
+
