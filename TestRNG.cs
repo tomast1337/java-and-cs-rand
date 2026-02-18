@@ -1,12 +1,10 @@
 /*
- * .NET 10 console application comparing:
- *   1. Native C#: System.Random
- *   2. IKVM Java: java.util.Random via IKVM bridge (Java has its own)
+ * .NET 10 console application: generate x numbers with seed from Java (reference), IKVM, and custom JavaRandom.
+ * Diffs: IKVM vs Java, JavaRandom (C#) vs Java. Timings for all three.
  *
- * Usage: TestRNG [seed] [count]
- *        seed: default 12345
- *        count: number of rounds (default 100). If given, writes ikvm.txt.
- *        Run Java TestRNG with same seed/count to get java.txt; diff the two.
+ * Usage: TestRNG [seed] [count] [mode]
+ *        seed: default 12345, count: rounds (default 100).
+ *        mode: "javarandom" | "ikvm" | omit = both. Used so verify.sh can time each with bash time.
  *
  * Each round: nextInt(), nextFloat(), nextLong(), nextDouble(), nextBoolean(), nextInt(100), nextGaussian()
  */
@@ -154,6 +152,17 @@ internal static class Program
 {
     private const int BoundForNextInt = 100;
 
+    private static void WriteOneRound(JavaRandom rng, StreamWriter w)
+    {
+        w.WriteLine(rng.NextInt());
+        w.WriteLine(rng.NextFloat().ToString("R"));
+        w.WriteLine(rng.NextLong());
+        w.WriteLine(rng.NextDouble().ToString("R"));
+        w.WriteLine(rng.NextBoolean());
+        w.WriteLine(rng.NextInt(BoundForNextInt));
+        w.WriteLine(rng.NextGaussian().ToString("R"));
+    }
+
     private static void WriteOneRoundIKVM(java.util.Random rng, StreamWriter w)
     {
         w.WriteLine(rng.nextInt());
@@ -181,20 +190,36 @@ internal static class Program
             Console.WriteLine(rng.nextInt());
     }
 
-    private static void WriteToFiles(long seed, int count)
+    private static void WriteToFiles(long seed, int count, string? mode)
     {
-        try
+        bool doJavaRandom = mode != "ikvm";
+        bool doIkvm = mode != "javarandom";
+
+        if (doJavaRandom)
         {
-            var ikvmRng = new java.util.Random(seed);
-            using (var ikvmW = new StreamWriter("ikvm.txt"))
+            var customRng = new JavaRandom(seed);
+            using (var csw = new StreamWriter("cs_java_random.txt"))
             {
                 for (int i = 0; i < count; i++)
-                    WriteOneRoundIKVM(ikvmRng, ikvmW);
+                    WriteOneRound(customRng, csw);
             }
         }
-        catch (Exception)
+
+        if (doIkvm)
         {
-            File.WriteAllText("ikvm.txt", ""); // empty so verify.sh can report IKVM failed
+            try
+            {
+                var ikvmRng = new java.util.Random(seed);
+                using (var ikvmW = new StreamWriter("ikvm.txt"))
+                {
+                    for (int i = 0; i < count; i++)
+                        WriteOneRoundIKVM(ikvmRng, ikvmW);
+                }
+            }
+            catch (Exception)
+            {
+                File.WriteAllText("ikvm.txt", "");
+            }
         }
     }
 
@@ -202,10 +227,11 @@ internal static class Program
     {
         long seed = args.Length > 0 ? long.Parse(args[0]) : 12345L;
         int? count = args.Length > 1 ? int.Parse(args[1]) : null;
+        string? mode = args.Length > 2 ? args[2] : null; // "javarandom" | "ikvm" | null = both
 
         if (count.HasValue)
         {
-            WriteToFiles(seed, count.Value);
+            WriteToFiles(seed, count.Value, mode);
             return;
         }
 

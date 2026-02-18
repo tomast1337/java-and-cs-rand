@@ -50,9 +50,6 @@ TestResult.xml
 ############################
 
 # Generated outputs / verification logs
-java_out.txt
-cs_full.txt
-custom_out.txt
-ikvm_out.txt
-TestRNG.class
+*.txt
+*.class
 
