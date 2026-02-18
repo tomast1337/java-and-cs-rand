@@ -21,7 +21,7 @@ fi
 
 echo "=== Building ==="
 javac TestRNG.java
-dotnet build TestRNG.csproj -c Release -nologo -v q
+dotnet build TestRNG.csproj -c Release
 
 echo ""
 echo "=== Running (seed=$SEED, count=$COUNT) — timed with bash time ==="
@@ -31,11 +31,11 @@ time java TestRNG "$SEED" "$COUNT"
 
 echo ""
 echo "--- JavaRandom (C#) -> cs_java_random.txt ---"
-time dotnet run --project TestRNG.csproj -c Release --no-build -nologo -v q -- "$SEED" "$COUNT" javarandom
+time dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" javarandom
 
 echo ""
 echo "--- IKVM -> ikvm.txt ---"
-time dotnet run --project TestRNG.csproj -c Release --no-build -nologo -v q -- "$SEED" "$COUNT" ikvm 2>/dev/null || true
+time dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" ikvm 2>/dev/null || true
 
 echo ""
 echo "=== Diff: Java vs JavaRandom (C#) ==="
