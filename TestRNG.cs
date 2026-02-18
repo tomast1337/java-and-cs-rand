@@ -158,7 +158,7 @@ internal static class Program
         w.WriteLine(rng.NextFloat().ToString("R"));
         w.WriteLine(rng.NextLong());
         w.WriteLine(rng.NextDouble().ToString("R"));
-        w.WriteLine(rng.NextBoolean());
+        w.WriteLine(rng.NextBoolean() ? "true" : "false");
         w.WriteLine(rng.NextInt(BoundForNextInt));
         w.WriteLine(rng.NextGaussian().ToString("R"));
     }
@@ -169,7 +169,7 @@ internal static class Program
         w.WriteLine(rng.nextFloat().ToString());
         w.WriteLine(rng.nextLong());
         w.WriteLine(rng.nextDouble().ToString());
-        w.WriteLine(rng.nextBoolean());
+        w.WriteLine(rng.nextBoolean() ? "true" : "false");
         w.WriteLine(rng.nextInt(BoundForNextInt));
         w.WriteLine(rng.nextGaussian().ToString());
     }
