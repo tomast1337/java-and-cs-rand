@@ -155,23 +155,26 @@ internal static class Program
     private static void WriteOneRound(JavaRandom rng, StreamWriter w)
     {
         w.WriteLine(rng.NextInt());
-        w.WriteLine(rng.NextFloat().ToString("R"));
+        w.WriteLine(BitConverter.SingleToInt32Bits(rng.NextFloat()).ToString("x8"));
         w.WriteLine(rng.NextLong());
-        w.WriteLine(rng.NextDouble().ToString("R"));
+        w.WriteLine(BitConverter.DoubleToInt64Bits(rng.NextDouble()).ToString("x16"));
         w.WriteLine(rng.NextBoolean() ? "true" : "false");
         w.WriteLine(rng.NextInt(BoundForNextInt));
-        w.WriteLine(rng.NextGaussian().ToString("R"));
+        w.WriteLine(BitConverter.DoubleToInt64Bits(rng.NextGaussian()).ToString("x16"));
     }
 
     private static void WriteOneRoundIKVM(java.util.Random rng, StreamWriter w)
     {
         w.WriteLine(rng.nextInt());
-        w.WriteLine(rng.nextFloat().ToString());
+        float f = rng.nextFloat();
+        w.WriteLine(BitConverter.SingleToInt32Bits(f).ToString("x8"));
         w.WriteLine(rng.nextLong());
-        w.WriteLine(rng.nextDouble().ToString());
+        double d = rng.nextDouble();
+        w.WriteLine(BitConverter.DoubleToInt64Bits(d).ToString("x16"));
         w.WriteLine(rng.nextBoolean() ? "true" : "false");
         w.WriteLine(rng.nextInt(BoundForNextInt));
-        w.WriteLine(rng.nextGaussian().ToString());
+        double g = rng.nextGaussian();
+        w.WriteLine(BitConverter.DoubleToInt64Bits(g).ToString("x16"));
     }
 
     private static void RunNativeCSharp(long seed)

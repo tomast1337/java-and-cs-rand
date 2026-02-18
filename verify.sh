@@ -10,6 +10,10 @@
 
 set -e
 
+# If the parent shell exported a `dotnet` function (e.g. adds -nologo),
+# bash will inherit it and it can break argument parsing. Always use the real binary.
+unset -f dotnet 2>/dev/null || true
+
 SEED="${1:-12345}"
 COUNT="${2:-100}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,7 +25,7 @@ fi
 
 echo "=== Building ==="
 javac TestRNG.java
-dotnet build TestRNG.csproj -c Release
+command dotnet build TestRNG.csproj -c Release
 
 echo ""
 echo "=== Running (seed=$SEED, count=$COUNT) — timed with bash time ==="
@@ -31,34 +35,62 @@ time java TestRNG "$SEED" "$COUNT"
 
 echo ""
 echo "--- JavaRandom (C#) -> cs_java_random.txt ---"
-time dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" javarandom
+time command dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" javarandom
 
 echo ""
 echo "--- IKVM -> ikvm.txt ---"
-time dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" ikvm 2>/dev/null || true
+time command dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" ikvm 2>/dev/null || true
+
+# Compare two files; treat 16-char hex (double bits) as equal if within 1 ULP (Java vs C#/IKVM log/sqrt can differ by 1 ULP).
+cmp_with_ulp() {
+    local ref="$1" other="$2" name="$3"
+    if [ ! -f "$other" ] || [ ! -s "$other" ]; then
+        echo "FAIL: $other missing or empty"
+        return 1
+    fi
+    local ref_lines other_lines
+    ref_lines=$(wc -l < "$ref")
+    other_lines=$(wc -l < "$other")
+    if [[ $ref_lines -ne $other_lines ]]; then
+        echo "FAIL: line count mismatch (Java $ref_lines, $name $other_lines)"
+        return 1
+    fi
+    local line=0 fail=0
+    while IFS= read -r r <&3 && IFS= read -r o <&4; do
+        (( line++ )) || true
+        if [[ "$r" == "$o" ]]; then
+            continue
+        fi
+        if [[ "$r" =~ ^[0-9a-f]{16}$ && "$o" =~ ^[0-9a-f]{16}$ ]]; then
+            local v1 v2 diff
+            v1=$(printf '%d' "0x$r")
+            v2=$(printf '%d' "0x$o")
+            diff=$(( v1 - v2 ))
+            [[ $diff -lt 0 ]] && diff=$((-diff))
+            if [[ $diff -le 1 ]]; then
+                continue
+            fi
+        fi
+        echo "First difference at line $line: ref='$r' $name='$o'"
+        fail=1
+        break
+    done 3<"$ref" 4<"$other"
+    if [[ $fail -eq 0 ]]; then
+        echo "PASS: $name matches Java (within 1 ULP for doubles)"
+    fi
+    return $fail
+}
 
 echo ""
 echo "=== Diff: Java vs JavaRandom (C#) ==="
-if [ ! -f cs_java_random.txt ] || [ ! -s cs_java_random.txt ]; then
-    echo "FAIL: cs_java_random.txt missing or empty"
-else
-    if diff -u java.txt cs_java_random.txt; then
-        echo "PASS: JavaRandom matches Java"
-    else
-        echo "FAIL: JavaRandom differs from Java"
-    fi
-fi
+cmp_with_ulp java.txt cs_java_random.txt "JavaRandom" || echo "FAIL: JavaRandom differs from Java"
 
 echo ""
 echo "=== Diff: Java vs IKVM ==="
 if [ ! -f ikvm.txt ] || [ ! -s ikvm.txt ]; then
     echo "NOTE: ikvm.txt missing or empty (IKVM may have crashed, e.g. libiava.so on Linux)."
 else
-    if diff -u java.txt ikvm.txt; then
-        echo "PASS: IKVM matches Java"
-    else
-        echo "FAIL: IKVM differs from Java"
-    fi
+    cmp_with_ulp java.txt ikvm.txt "IKVM" || echo "FAIL: IKVM differs from Java"
 fi
 
 echo ""

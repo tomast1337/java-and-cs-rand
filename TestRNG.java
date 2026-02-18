@@ -18,12 +18,12 @@ public class TestRNG {
 
     private static void writeOneRound(Random rng, PrintWriter w) {
         w.println(rng.nextInt());
-        w.println(rng.nextFloat());
+        w.println(String.format("%08x", Float.floatToIntBits(rng.nextFloat())));
         w.println(rng.nextLong());
-        w.println(rng.nextDouble());
+        w.println(String.format("%016x", Double.doubleToLongBits(rng.nextDouble())));
         w.println(rng.nextBoolean());
         w.println(rng.nextInt(BOUND_FOR_NEXT_INT));
-        w.println(rng.nextGaussian());
+        w.println(String.format("%016x", Double.doubleToLongBits(rng.nextGaussian())));
     }
 
     public static void main(String[] args) throws IOException {
