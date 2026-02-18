@@ -1,23 +1,22 @@
 /*
- * .NET 10 console application comparing three RNG implementations:
+ * .NET 10 console application comparing:
  *   1. Native C#: System.Random
- *   2. Custom C#: JavaRandom (48-bit LCG matching java.util.Random exactly)
- *   3. IKVM Java: java.util.Random via IKVM bridge
+ *   2. IKVM Java: java.util.Random via IKVM bridge (Java has its own)
  *
- * Usage: TestRNG [seed]
- *        If no seed is provided, defaults to 12345.
+ * Usage: TestRNG [seed] [count]
+ *        seed: default 12345
+ *        count: number of rounds (default 100). If given, writes ikvm.txt.
+ *        Run Java TestRNG with same seed/count to get java.txt; diff the two.
  *
- * Outputs three sections (Native, Custom, IKVM) of 100 nextInt() values each.
- * Compare against Java TestRNG output to verify IKVM bridge correctness.
+ * Each round: nextInt(), nextFloat(), nextLong(), nextDouble(), nextBoolean(), nextInt(100), nextGaussian()
  */
 
-
 /// <summary>
-/// C# port of Java's 48-bit LCG (Linear Congruential Generator) from java.util.Random.
-/// Original source: https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/java/util/Random.java
+/// C# port of Java's 48-bit LCG (Linear Congruential Generator) from Random.
+/// Original source: https://github.com/openjdk/jdk/blob/master/src/java.base/share/classes/Random.java
 /// Implements the exact algorithm: seed = (seed * 0x5DEECE66DL + 0xBL) &amp; ((1L &lt;&lt; 48) - 1)
 /// </summary>
-internal sealed class JavaRandom
+public class JavaRandom
 {
     private static long _seedUniquifier = 8682522807148012L;
     private readonly object _lock = new object();
@@ -36,8 +35,10 @@ internal sealed class JavaRandom
         SetSeed(seed);
     }
 
-    public JavaRandom() : this(SeedUniquifier() ^ DateTime.UtcNow.Ticks) { }
-
+    public JavaRandom()
+        : this(SeedUniquifier() ^ DateTime.UtcNow.Ticks)
+    {
+    }
     public void SetSeed(long seed)
     {
         lock (_lock)
@@ -47,7 +48,10 @@ internal sealed class JavaRandom
         }
     }
 
-    private static long InitialScramble(long seed) => (seed ^ Multiplier) & Mask;
+    private static long InitialScramble(long seed)
+    {
+        return (seed ^ Multiplier) & Mask;
+    }
 
     private int Next(int bits)
     {
@@ -56,21 +60,30 @@ internal sealed class JavaRandom
         {
             oldSeed = Interlocked.Read(ref _seed);
             nextSeed = (oldSeed * Multiplier + Addend) & Mask;
-        }
+        } 
         while (Interlocked.CompareExchange(ref _seed, nextSeed, oldSeed) != oldSeed);
 
         return (int)((ulong)nextSeed >> (48 - bits));
     }
 
-    public int NextInt() => Next(32);
+    public int NextInt()
+    {
+        return Next(32);
+    }
+    public float NextFloat()
+    {
+        return Next(24) * FloatUnit;
+    }
 
-    public float NextFloat() => Next(24) * FloatUnit;
+    public long NextLong()
+    {
+        return ((long)Next(32) << 32) + Next(32);
+    }
 
-    public long NextLong() => ((long)Next(32) << 32) + Next(32);
-
-    public double NextDouble() => (((long)Next(26) << 27) + Next(27)) * DoubleUnit;
-
-    public bool NextBoolean() => Next(1) != 0;
+    public double NextDouble()
+    {
+        return (((long)Next(26) << 27) + Next(27)) * DoubleUnit;
+    }
 
     public int NextInt(int bound)
     {
@@ -86,14 +99,13 @@ internal sealed class JavaRandom
         }
         else
         {
-            for (int u = r; u - (r = u % bound) + m < 0; u = Next(31)) { }
+            for (int u = r; u - (r = u % bound) + m < 0; u = Next(31)){ }
         }
 
         return r;
     }
 
-
-
+    public bool NextBoolean() => Next(1) != 0;
     public double NextGaussian()
     {
         lock (_lock)
@@ -140,20 +152,25 @@ internal sealed class JavaRandom
 
 internal static class Program
 {
+    private const int BoundForNextInt = 100;
+
+    private static void WriteOneRoundIKVM(java.util.Random rng, StreamWriter w)
+    {
+        w.WriteLine(rng.nextInt());
+        w.WriteLine(rng.nextFloat().ToString());
+        w.WriteLine(rng.nextLong());
+        w.WriteLine(rng.nextDouble().ToString());
+        w.WriteLine(rng.nextBoolean());
+        w.WriteLine(rng.nextInt(BoundForNextInt));
+        w.WriteLine(rng.nextGaussian().ToString());
+    }
+
     private static void RunNativeCSharp(long seed)
     {
         Console.WriteLine("# Native C# (System.Random)");
         var rng = new System.Random((int)(seed & 0x7FFFFFFF));
         for (int i = 0; i < 100; i++)
             Console.WriteLine(rng.Next());
-    }
-
-    private static void RunCustomCSharp(long seed)
-    {
-        Console.WriteLine("# Custom C# (JavaRandom - 48-bit LCG)");
-        var rng = new JavaRandom(seed);
-        for (int i = 0; i < 100; i++)
-            Console.WriteLine(rng.NextInt());
     }
 
     private static void RunIKVMJava(long seed)
@@ -164,14 +181,35 @@ internal static class Program
             Console.WriteLine(rng.nextInt());
     }
 
+    private static void WriteToFiles(long seed, int count)
+    {
+        try
+        {
+            var ikvmRng = new java.util.Random(seed);
+            using (var ikvmW = new StreamWriter("ikvm.txt"))
+            {
+                for (int i = 0; i < count; i++)
+                    WriteOneRoundIKVM(ikvmRng, ikvmW);
+            }
+        }
+        catch (Exception)
+        {
+            File.WriteAllText("ikvm.txt", ""); // empty so verify.sh can report IKVM failed
+        }
+    }
+
     public static void Main(string[] args)
     {
         long seed = args.Length > 0 ? long.Parse(args[0]) : 12345L;
+        int? count = args.Length > 1 ? int.Parse(args[1]) : null;
+
+        if (count.HasValue)
+        {
+            WriteToFiles(seed, count.Value);
+            return;
+        }
 
         RunNativeCSharp(seed);
-        Console.WriteLine();
-
-        RunCustomCSharp(seed);
         Console.WriteLine();
 
         RunIKVMJava(seed);
