@@ -23,6 +23,7 @@ public class JavaRandom
 {
     private static long _seedUniquifier = 8682522807148012L;
     private readonly object _lock = new object();
+    private readonly object _seedLock = new object();
     private bool _haveNextNextGaussian = false;
     private double _nextNextGaussian;
     private const float FloatUnit = 1.0f / (1 << 24);
@@ -56,15 +57,16 @@ public class JavaRandom
         return (seed ^ Multiplier) & Mask;
     }
 
+    [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
     private int Next(int bits)
     {
-        long oldSeed, nextSeed;
-        do
+        long nextSeed;
+
+        lock (_seedLock)
         {
-            oldSeed = Interlocked.Read(ref _seed);
-            nextSeed = (oldSeed * Multiplier + Addend) & Mask;
-        } 
-        while (Interlocked.CompareExchange(ref _seed, nextSeed, oldSeed) != oldSeed);
+            _seed = (_seed * Multiplier + Addend) & Mask;
+            nextSeed = _seed;
+        }
 
         return (int)((ulong)nextSeed >> (48 - bits));
     }
