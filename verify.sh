@@ -35,11 +35,11 @@ time java TestRNG "$SEED" "$COUNT"
 
 echo ""
 echo "--- JavaRandom (C#) -> cs_java_random.txt ---"
-time command dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" javarandom
+time dotnet "$PWD/bin/Release/net10.0/TestRNG.dll" "$SEED" "$COUNT" javarandom
 
 echo ""
 echo "--- IKVM -> ikvm.txt ---"
-time command dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" ikvm 2>/dev/null || true
+time dotnet "$PWD/bin/Release/net10.0/TestRNG.dll" "$SEED" "$COUNT" ikvm 2>/dev/null || true
 
 # Compare two files; treat 16-char hex (double bits) as equal if within 3 ULP (Java vs C#/IKVM log/sqrt can differ slightly).
 # Use Python for unsigned 64-bit hex diff to avoid bash printf overflow.
@@ -110,8 +110,8 @@ time java TestRNG "$SEED" "$COUNT" noio
 
 echo ""
 echo "--- JavaRandom (C# no I/O) ---"
-time command dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" javarandom-noio
+time dotnet "$PWD/bin/Release/net10.0/TestRNG.dll" "$SEED" "$COUNT" javarandom-noio
 
 echo ""
 echo "--- IKVM (no I/O) ---"
-time command dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" ikvm-noio 2>/dev/null || true
+time dotnet "$PWD/bin/Release/net10.0/TestRNG.dll" "$SEED" "$COUNT" ikvm-noio 2>/dev/null || true
