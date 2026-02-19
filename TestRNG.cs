@@ -4,7 +4,12 @@
  *
  * Usage: TestRNG [seed] [count] [mode]
  *        seed: default 12345, count: rounds (default 100).
- *        mode: "javarandom" | "ikvm" | omit = both. Used so verify.sh can time each with bash time.
+ *        mode:
+ *          null / omitted      → write cs_java_random.txt and ikvm.txt
+ *          "javarandom"        → write only cs_java_random.txt
+ *          "ikvm"              → write only ikvm.txt
+ *          "javarandom-noio"   → generate only with JavaRandom (no file I/O, benchmark)
+ *          "ikvm-noio"         → generate only with IKVM (no file I/O, benchmark)
  *
  * Each round: nextInt(), nextFloat(), nextLong(), nextDouble(), nextBoolean(), nextInt(100), nextGaussian()
  */
@@ -226,15 +231,72 @@ internal static class Program
         }
     }
 
+    private static void GenerateNoIo(long seed, int count, string? mode)
+    {
+        bool doJavaRandom = mode != "ikvm-noio";
+        bool doIkvm = mode != "javarandom-noio";
+
+        double sink = 0;
+
+        if (doJavaRandom)
+        {
+            var customRng = new JavaRandom(seed);
+            for (int i = 0; i < count; i++)
+            {
+                sink += customRng.NextInt();
+                sink += customRng.NextFloat();
+                sink += customRng.NextLong();
+                sink += customRng.NextDouble();
+                sink += customRng.NextBoolean() ? 1 : 0;
+                sink += customRng.NextInt(BoundForNextInt);
+                sink += customRng.NextGaussian();
+            }
+        }
+
+        if (doIkvm)
+        {
+            try
+            {
+                var ikvmRng = new java.util.Random(seed);
+                for (int i = 0; i < count; i++)
+                {
+                    sink += ikvmRng.nextInt();
+                    sink += ikvmRng.nextFloat();
+                    sink += ikvmRng.nextLong();
+                    sink += ikvmRng.nextDouble();
+                    sink += ikvmRng.nextBoolean() ? 1 : 0;
+                    sink += ikvmRng.nextInt(BoundForNextInt);
+                    sink += ikvmRng.nextGaussian();
+                }
+            }
+            catch (Exception)
+            {
+                // ignore – this mode is only for benchmarking IKVM when available
+            }
+        }
+
+        if (Math.Abs(sink) == double.NegativeInfinity)
+        {
+            Console.WriteLine(); // prevent "unused" optimisation
+        }
+    }
+
     public static void Main(string[] args)
     {
         long seed = args.Length > 0 ? long.Parse(args[0]) : 12345L;
         int? count = args.Length > 1 ? int.Parse(args[1]) : null;
-        string? mode = args.Length > 2 ? args[2] : null; // "javarandom" | "ikvm" | null = both
+        string? mode = args.Length > 2 ? args[2] : null;
 
         if (count.HasValue)
         {
-            WriteToFiles(seed, count.Value, mode);
+            if (mode == "javarandom-noio" || mode == "ikvm-noio")
+            {
+                GenerateNoIo(seed, count.Value, mode);
+            }
+            else
+            {
+                WriteToFiles(seed, count.Value, mode);
+            }
             return;
         }
 

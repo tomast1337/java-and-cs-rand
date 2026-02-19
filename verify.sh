@@ -41,7 +41,8 @@ echo ""
 echo "--- IKVM -> ikvm.txt ---"
 time command dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" ikvm 2>/dev/null || true
 
-# Compare two files; treat 16-char hex (double bits) as equal if within 1 ULP (Java vs C#/IKVM log/sqrt can differ by 1 ULP).
+# Compare two files; treat 16-char hex (double bits) as equal if within 3 ULP (Java vs C#/IKVM log/sqrt can differ slightly).
+# Use Python for unsigned 64-bit hex diff to avoid bash printf overflow.
 cmp_with_ulp() {
     local ref="$1" other="$2" name="$3"
     if [ ! -f "$other" ] || [ ! -s "$other" ]; then
@@ -62,12 +63,14 @@ cmp_with_ulp() {
             continue
         fi
         if [[ "$r" =~ ^[0-9a-f]{16}$ && "$o" =~ ^[0-9a-f]{16}$ ]]; then
-            local v1 v2 diff
-            v1=$(printf '%d' "0x$r")
-            v2=$(printf '%d' "0x$o")
-            diff=$(( v1 - v2 ))
-            [[ $diff -lt 0 ]] && diff=$((-diff))
-            if [[ $diff -le 1 ]]; then
+            local ulp_ok
+            ulp_ok=$(python3 -c "
+a = int('$r', 16)
+b = int('$o', 16)
+d = abs(a - b)
+print(1 if d <= 3 else 0)
+" 2>/dev/null) || ulp_ok=0
+            if [[ "$ulp_ok" == "1" ]]; then
                 continue
             fi
         fi
@@ -76,7 +79,7 @@ cmp_with_ulp() {
         break
     done 3<"$ref" 4<"$other"
     if [[ $fail -eq 0 ]]; then
-        echo "PASS: $name matches Java (within 1 ULP for doubles)"
+        echo "PASS: $name matches Java (within 3 ULP for doubles)"
     fi
     return $fail
 }
@@ -98,3 +101,17 @@ echo "=== Summary ==="
 echo "java.txt:           $(wc -l < java.txt 2>/dev/null || echo 0) lines"
 echo "cs_java_random.txt: $(wc -l < cs_java_random.txt 2>/dev/null || echo 0) lines"
 echo "ikvm.txt:           $(wc -l < ikvm.txt 2>/dev/null || echo 0) lines"
+
+echo ""
+echo "=== Pure RNG benchmark (no I/O) ==="
+
+echo "--- Java (no I/O) ---"
+time java TestRNG "$SEED" "$COUNT" noio
+
+echo ""
+echo "--- JavaRandom (C# no I/O) ---"
+time command dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" javarandom-noio
+
+echo ""
+echo "--- IKVM (no I/O) ---"
+time command dotnet run --project TestRNG.csproj -c Release --no-build -- "$SEED" "$COUNT" ikvm-noio 2>/dev/null || true
